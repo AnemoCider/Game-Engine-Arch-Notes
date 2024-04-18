@@ -79,11 +79,9 @@ pipelining: begin a new instruction every clock cycle to overlad the stages
   - therefore, we want all stages to have the same latency, e.g., by breaking down slow stages
 - tradeoff: more stages means higher overall latency
 
-### Stall
+### Stall And Data Dependencies
 
 At some clock cycle the CPU cannot issue a new instruction, causing a "bubble" which passes in the pipeline.
-
-### Data Dependencies
 
 Stalls are typically caused by dependencies:
 
@@ -91,7 +89,51 @@ Stalls are typically caused by dependencies:
 - control dependency (branch dependency)
 - structural dependency (resource dependency)
 
-Here is some ways to avoid data dependencies.
+#### Data Dependencies
 
-#### Instruction Reordering
+Here is some ways to avoid data dependencies. However, they can cause bugs in concurrent programs as well.
 
+- Instruction Reordering
+  - For any pair of interdependent instructions, we can reorder them with nearby independent instructions
+  - Compilers does this automatically
+- Out-of-Order Execution
+  - CPUs can detect data dependencies and execute instructions out of order
+  - They look ahead in the instruction stream, analyzing the use of registers
+
+### Branch Dependencies
+
+#### branch assembly
+
+- consider `(b != 0) ? a / b : someVal;`
+  - This will be translated to `cmp b, 0; jz SkipDivision`
+  - The conditional jump cannot happen until `b` is calculated
+- Speculative Execution
+  - i.e., `branch prediction`
+  - CPU guesses which branch to take
+  - If the guess is wrong, the pipeline has to be flushed and restarted
+  - E.g., backward branches are always taken (e.g., `while`), and forward branches are never taken (e.g., `else`)
+- Predication
+  - Attempts to avoid branches
+  - Idea: run both paths, each predicated by a condition
+  - In the case above, we just calculate both result and do some bitwise operations to get the correct result
+  - Problem: It may not be safe to run both paths, e.g., `(b != 0) : a / b : 0`
+
+### Superscalar CPUs
+
+- duplicate (most parts of) the CPU to issue multiple instructions in a single clock cycle
+  - still only one instruction stream, but fetches multiple instructions at once
+  - requires complicated dispatch logic to deal with previous 2 kinds of dependencies
+  - it also introduces a new kind of dependency, described below
+
+#### Resource Dependencies
+
+- multiple consecutive instructions all require the same functional unit (i.e., resource)
+  - there may be 2 ALUs but 1 FPU, so the CPU cannot perform two floating point operations in a single clock cycle
+
+### VLIW
+
+- Problem: Dispatch logic is complicated and expensive
+  - CPU cannot see very far in the instruction stream, so it may not predict well
+  - complex dispatch logic unit requires much real estate on the chip, expensive
+- Idea: Leave the dispatch logic to the programmer and/or compiler
+- VLIW: Very Long Instruction Word
