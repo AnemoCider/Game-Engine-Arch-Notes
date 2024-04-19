@@ -137,3 +137,5 @@ Here is some ways to avoid data dependencies. However, they can cause bugs in co
   - complex dispatch logic unit requires much real estate on the chip, expensive
 - Idea: Leave the dispatch logic to the programmer and/or compiler
 - VLIW: Very Long Instruction Word
+  - A instruction word contains multiple slots, each corresponding to a compute element
+  - Programmers/Compiler dispatch instructions to multiple computing units per clock cycle
