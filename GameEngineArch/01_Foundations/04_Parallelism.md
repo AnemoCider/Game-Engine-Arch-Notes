@@ -27,7 +27,7 @@ Definition: two or mode hardware components are operating simultaneously
 - explicit: multiple instruction streams
   - e.g., hyperthreaded or multicore CPUs
 
-### Dask vs Data Parallelism and Flynn's Taxonomy
+### Task vs Data Parallelism and Flynn's Taxonomy
 
 Two orthogonal axes:
 
@@ -139,3 +139,18 @@ Here is some ways to avoid data dependencies. However, they can cause bugs in co
 - VLIW: Very Long Instruction Word
   - A instruction word contains multiple slots, each corresponding to a compute element
   - Programmers/Compiler dispatch instructions to multiple computing units per clock cycle
+  - Problem: hard to convert serial code to VLIW code
+
+## Explicit Parallelism
+
+Recall that it refers to the ability of hardware processing mulitple instruction streams at the same time.
+
+### Hyperthreading
+
+- Idea: CPU utilizes out-of-order execution, selecting independent instructions to fill delay slots (bubbles in the pipeline)
+  - However, CPU has limited choice from only a single instruction stream
+- Hyperthreading: CPU has multiple instruction streams
+  - CPU can select from multiple streams
+  - An HT core has two register files (and other necessary components) and two instruction decode units, and a single backend and L1 cache for execution.
+    - Recall that each thread need to have its own PC, SP, and registers
+  - uses fewer transistors can a dual core CPU
