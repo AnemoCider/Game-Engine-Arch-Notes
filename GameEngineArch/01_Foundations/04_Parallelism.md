@@ -1,5 +1,44 @@
 # Parallelism and Concurrent Programming
 
+## Table of Contents
+
+- [Parallelism and Concurrent Programming](#parallelism-and-concurrent-programming)
+  - [Table of Contents](#table-of-contents)
+  - [Intro](#intro)
+  - [Defining Concurrency and Parallelism](#defining-concurrency-and-parallelism)
+    - [Concurrency](#concurrency)
+    - [Parallelism](#parallelism)
+      - [Implicit vs Explicit Parallelism](#implicit-vs-explicit-parallelism)
+    - [Task vs Data Parallelism and Flynn's Taxonomy](#task-vs-data-parallelism-and-flynns-taxonomy)
+      - [GPU: SIMT](#gpu-simt)
+    - [Orthogonality of Concurrency and Parallelism](#orthogonality-of-concurrency-and-parallelism)
+  - [Implicit Parallelism](#implicit-parallelism)
+    - [Pipelining](#pipelining)
+    - [Latency vs Throughput](#latency-vs-throughput)
+    - [Stall And Data Dependencies](#stall-and-data-dependencies)
+      - [Data Dependencies](#data-dependencies)
+    - [Branch Dependencies](#branch-dependencies)
+      - [branch assembly](#branch-assembly)
+    - [Superscalar CPUs](#superscalar-cpus)
+      - [Resource Dependencies](#resource-dependencies)
+    - [VLIW](#vliw)
+  - [Explicit Parallelism](#explicit-parallelism)
+    - [Hyperthreading](#hyperthreading)
+    - [Multicore CPUs](#multicore-cpus)
+    - [Symmetric vs Asymmetric Multiprocessing](#symmetric-vs-asymmetric-multiprocessing)
+    - [Distributed Computing](#distributed-computing)
+  - [Operating System Fundamentals](#operating-system-fundamentals)
+    - [OS kernel](#os-kernel)
+      - [Kernel Mode vs User Mode](#kernel-mode-vs-user-mode)
+      - [Kernel Mode Privileges](#kernel-mode-privileges)
+    - [Interrupts](#interrupts)
+    - [Kernel Calls](#kernel-calls)
+    - [Preemptive Multitasking](#preemptive-multitasking)
+    - [Processes](#processes)
+      - [Anatomy of a Process](#anatomy-of-a-process)
+      - [Virtul Memory Map of a Process](#virtul-memory-map-of-a-process)
+
+
 ## Intro
 
 Computing performance measurements:
@@ -154,3 +193,102 @@ Recall that it refers to the ability of hardware processing mulitple instruction
   - An HT core has two register files (and other necessary components) and two instruction decode units, and a single backend and L1 cache for execution.
     - Recall that each thread need to have its own PC, SP, and registers
   - uses fewer transistors can a dual core CPU
+
+### Multicore CPUs
+
+- `core`: each core can be serial, pipeline, hyperthread design, etc.
+- Separate L1 caches, shared L2 cache
+
+### Symmetric vs Asymmetric Multiprocessing
+
+- How the CPU cores are treated
+  - Symmetric: all cores are equal
+  - Asymmetric Multiprocessing (AMP)
+    - Typically one "master" core runs the OS
+    - Other cores do workloads distributed by the master
+
+### Distributed Computing
+
+- Idea: use multiple standalone computers, e.g., cloud computing
+
+## Operating System Fundamentals
+
+### OS kernel
+
+#### Kernel Mode vs User Mode
+
+- Kernel mode: The privileged mode that the kernel (and its device drives) runs in
+- User mode softwares can only access low-level services through a kernel call
+- Protection rings: levels of privilege, e.g., kernel -> drivers -> trusted apps -> user apps
+
+#### Kernel Mode Privileges
+
+- Access to all machine languages defined by the CPU's ISA
+  - x86: `wrmsr` write to model-specific register, `cli` clear interrupt flag (i.e., disable interrupts)
+
+### Interrupts
+
+- Interrupt: a signal to the CPU to notify some low-level event
+  - E.g., key press, a signal from peripheral device, the expiration of a timer, etc.
+- Every event raises an interrupt request (IRQ)
+- If the OS wishes to respond, it will pauses the current stream and calls a interrupt service routine (ISR) function
+- Hardware interrupts: triggered by external devices
+  - requested by placing a non-zero voltage on one of the CPU's pins
+  - they may be raised by devices such as keyboard, mouse, or a periodic timer circuit
+  - They can happen even when the CPU is in the middle of executing an instruction, so there may be delay to handle the request
+- Software interrupts: triggered by software
+  - can be triggered explicitly by executing an "interrupt" instruction
+  - can also be triggered in response to an error detected by the CPU, which is what we call a "trap" or "exception"
+  - often leads to core dump, or a breakpoint hit if a debugger is attached
+
+### Kernel Calls
+
+- User software issues a kernel call (system call) to perform a privileged operation
+  - e.g., map a physical page into virtual memory (`mmap`), access a raw network socket (`socket`)
+  - The call is accomplished by placing the arguments in a specific place, then triggering a software interrupt
+  - The low-level details are wrapped by kernel API functions, which are actually called by the user program
+
+### Preemptive Multitasking
+
+- cooperative multitasking: each program occupies a certian period, called a `time slice`, and yield the CPU
+  - formally, `time division multiplexing (TDM)` or `temporal multitasking (TMT)`
+  - problem: what if a program fails to yield the CPU?
+- preemptive multitasking: 
+  - programs still share the CPU by time-slicing, but OS controls the scheduling
+  - `quantum`: the time slice, by default 100ms on Linux
+
+### Processes
+
+- Process: a program in execution
+  - i.e., the OS's way of managing a running instance of a program
+
+#### Anatomy of a Process
+
+- A process consists of:
+  - pid
+  - a set of permissions
+  - a reference to the parent process
+  - a virtual memory space
+  - the values of environment variables
+  - a set of open file handles
+  - the current working directory
+  - resources for managing synchronization and communication with other processes
+    - message queues, pipes, semaphores
+  - one or more threads
+- `thread`: a running instance of a single stream of maching language instructions
+  - **fundamental unit** of program execution
+  - where as a process merely provides an environment for threads to run
+    - the virtual memory space
+    - a set of **resources** shared among threads
+
+#### Virtul Memory Map of a Process
+
+- protection
+  - kernel has a reserved kernel space, which can only accessed by code running in kernel mode
+- a process's `memory map` typically contains:
+  - the text, data and BSS sections read from the program's executable file
+  - a view of shared libraries, e.g., DLLs
+  - a call stack for each thread
+  - a heap
+  - (optional) pages shared with other processes
+  - a range of kernel space addresses, only accessible whenever a kernel call executes
