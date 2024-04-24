@@ -41,6 +41,11 @@
       - [Thread Libraries](#thread-libraries)
       - [Thread Creation and Termination](#thread-creation-and-termination)
       - [Polling, Blocking and Bielding](#polling-blocking-and-bielding)
+      - [Context Switching](#context-switching)
+      - [Thread Priorities and Affinity](#thread-priorities-and-affinity)
+      - [TLS: thread local storage](#tls-thread-local-storage)
+    - [Fibers](#fibers)
+      - [Fiber Creation and Destruction](#fiber-creation-and-destruction)
 
 
 ## Intro
@@ -309,7 +314,12 @@ Recall that it refers to the ability of hardware processing mulitple instruction
 
 ### Threads
 
-(Review) A `thread` encapsulates a running instance of a single stream of machine language instructions.
+(Review) A `thread` encapsulates a running instance of a single stream of machine language instructions. It consists of:
+
+- a thread id, unique within the process
+- call stack, containing the stack frames of all currently-executing functions
+- values of registers, e.g., program counter and stack pointer
+- thread local storage (`TLS`), storing private data of the thread
 
 #### Thread Libraries
 
@@ -346,3 +356,34 @@ A thread may want to wait for some event to happen. There are three ways to do t
   - e.g., `fopen`, `std::this_thread::sleep_until()`, `pthread_join()`, `pthread_mutex_wait()`
 - yielding
   - like polling, but instead of busy waiting, the thread yields the CPU, thus wasting less resources
+
+#### Context Switching
+
+- Three states:
+  - running
+  - runnable (ready)
+  - blocked
+- Context switch
+  - def.: the kernel causes a thread to transition from any state to another
+  - must happen in privileged mode
+  - the kernel needs to load/save the thread's context when transitioning to/from the running state
+    - note that the thread's call stack need not to move, since it's already in the memory, and we refer to it by `sp` and `bp`
+  - if the thread is from a different process, the kernel has to save and set up the virtual memory map and flush translation lookaside buffer (`TLB`)
+
+#### Thread Priorities and Affinity
+
+- These are two ways for programmer's to schedule threads.
+- Priority: no lower-priority thread can run as long as some higher-priority runnable thread exists
+  - problem: starvation. Can be mitigated by introducing some exceptions to the simple rule.
+- Affinity: request to lock a thread to a particular core, or prefer some core when scheduling it
+
+#### TLS: thread local storage
+
+- TLS: a way to store private data for each thread
+
+### Fibers
+
+- cooperative multitasking mechanism
+- Fibers are like threads, but they run within the context of a thread, and are scheduled cooperatively by each other
+
+#### Fiber Creation and Destruction

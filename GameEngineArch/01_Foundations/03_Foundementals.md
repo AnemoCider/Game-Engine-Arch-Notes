@@ -140,8 +140,8 @@ In early days, memory access latency was rougly equal to instruction execution l
 Workarounds:
 
 - reducing average memory latency, e.g., cache
-- hiding memory access lantency by arraging CPU to do other work
-- minimizing access to main memory by arraging the program's data
+- hiding memory access lantency by arranging CPU to do other work
+- minimizing access to main memory by arranging the program's data
 
 #### Memory Cache Hierarchies
 
