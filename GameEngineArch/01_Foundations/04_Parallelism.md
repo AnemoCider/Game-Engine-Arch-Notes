@@ -37,6 +37,10 @@
     - [Processes](#processes)
       - [Anatomy of a Process](#anatomy-of-a-process)
       - [Virtul Memory Map of a Process](#virtul-memory-map-of-a-process)
+    - [Threads](#threads)
+      - [Thread Libraries](#thread-libraries)
+      - [Thread Creation and Termination](#thread-creation-and-termination)
+      - [Polling, Blocking and Bielding](#polling-blocking-and-bielding)
 
 
 ## Intro
@@ -292,3 +296,53 @@ Recall that it refers to the ability of hardware processing mulitple instruction
   - a heap
   - (optional) pages shared with other processes
   - a range of kernel space addresses, only accessible whenever a kernel call executes
+- dynamic linking
+  - when first time a DLL is needed, it is loaded into memory, and a view of it is mapped to the process's virtual memory
+  - when another process needs the same DLL, the corresponding physical pages are mapped
+  - avoid code copying, contrary to static linking; avoid relinking when the DLL is updated
+  - problem: compatability between the program and DLL, when the DLL is updated
+- kernel space
+  - on 32-bit Windows, user space ranges from 0x00000000 to 0x7FFFFFFF, and kernel space ranges from 0x80000000 to 0xFFFFFFFF
+  - the virtual page table for the kernel is shared among all processes
+- Relocatable code
+  - OS may load the program to different addresses each time (e.g., `PIC`: position independent code, `ASLR`: address space layout randomization), so the executable code should be relocatable, and OS will fix up the addresses within the code
+
+### Threads
+
+(Review) A `thread` encapsulates a running instance of a single stream of machine language instructions.
+
+#### Thread Libraries
+
+Examples: *pthread* and *std::thread*
+
+Universal APIs include:
+
+- create
+- terminate
+- request another thread to exit
+- sleep
+- yield
+- join
+
+#### Thread Creation and Termination
+
+- thread termination happens when:
+  - the thread ends naturally by returning from the entry point function
+    - returning from `main` ends the process as well
+  - a exit function is called, e.g., `pthread_exit`
+  - the thread is killed (cancelled) externally
+  - the thread is focibly killed because the process has ended
+
+#### Polling, Blocking and Bielding
+
+A thread may want to wait for some event to happen. There are three ways to do this:
+
+- polling
+  - busy waiting (spin waiting) by repeatedly checking the status
+  - wastes CPU resources
+  - only suitable for very short waits
+- blocking
+  - calls a `blocking function`: if condition not met, add to some queue and sleep
+  - e.g., `fopen`, `std::this_thread::sleep_until()`, `pthread_join()`, `pthread_mutex_wait()`
+- yielding
+  - like polling, but instead of busy waiting, the thread yields the CPU, thus wasting less resources
