@@ -40,12 +40,30 @@
     - [Threads](#threads)
       - [Thread Libraries](#thread-libraries)
       - [Thread Creation and Termination](#thread-creation-and-termination)
-      - [Polling, Blocking and Bielding](#polling-blocking-and-bielding)
+      - [Polling, Blocking and Yielding](#polling-blocking-and-yielding)
       - [Context Switching](#context-switching)
       - [Thread Priorities and Affinity](#thread-priorities-and-affinity)
       - [TLS: thread local storage](#tls-thread-local-storage)
     - [Fibers](#fibers)
-      - [Fiber Creation and Destruction](#fiber-creation-and-destruction)
+    - [User-level treads and coroutines](#user-level-treads-and-coroutines)
+      - [Coroutines](#coroutines)
+      - [Kernel Threads vs. User Threads](#kernel-threads-vs-user-threads)
+  - [Concurrent Programming](#concurrent-programming)
+    - [Why concurrent](#why-concurrent)
+    - [Concurrent programming models](#concurrent-programming-models)
+  - [Lock-Free Concurrency](#lock-free-concurrency)
+    - [Causes of Data Race Bugs](#causes-of-data-race-bugs)
+    - [Implementing Atomicity](#implementing-atomicity)
+    - [Barriers](#barriers)
+      - [Volatile (and why it doesn't help)](#volatile-and-why-it-doesnt-help)
+      - [Compiler Barriers](#compiler-barriers)
+    - [Memory Ordering Semantics](#memory-ordering-semantics)
+      - [Multicore Cache Coherency Protocols](#multicore-cache-coherency-protocols)
+      - [How MESI Can Go Wrong](#how-mesi-can-go-wrong)
+      - [Memory Fences](#memory-fences)
+      - [Acquire and Release Semantics](#acquire-and-release-semantics)
+      - [When to use acquire and release semantics](#when-to-use-acquire-and-release-semantics)
+    - [Atomic Variables](#atomic-variables)
 
 
 ## Intro
@@ -343,7 +361,7 @@ Universal APIs include:
   - the thread is killed (cancelled) externally
   - the thread is focibly killed because the process has ended
 
-#### Polling, Blocking and Bielding
+#### Polling, Blocking and Yielding
 
 A thread may want to wait for some event to happen. There are three ways to do this:
 
@@ -384,6 +402,122 @@ A thread may want to wait for some event to happen. There are three ways to do t
 ### Fibers
 
 - cooperative multitasking mechanism
-- Fibers are like threads, but they run within the context of a thread, and are scheduled cooperatively by each other
+- Fibers are like threads, but they run within the context of a thread, and are scheduled cooperatively by each other in user-level, but the context switches are still managed by the kernel
+- One thread can have multiple fibers
 
-#### Fiber Creation and Destruction
+### User-level treads and coroutines
+
+Pure user-leveo to avoid context switch, increasing the performance. Key problem: how to manually implement a context switch, which further boils down to manage CPU registers.
+
+#### Coroutines
+
+Essentially, functions that can pause and resume later.
+
+#### Kernel Threads vs. User Threads
+
+- Kernel thread
+  - Ambiguity
+    - a thread that runs kernel functions, must be in privileged mode
+    - or, any thread that is known to and scheduled by the kernel, which contrasts a user-level thread
+
+## Concurrent Programming
+
+### Why concurrent
+
+- sometimes multiple semi-independent flows of control better match the problem than a single flow
+- it better makes use of a multicore computing platform
+
+### Concurrent programming models
+
+- message passing
+  - concurrent threads pass messages to share data and sync
+- shared memory
+  - efficient, but hard to sync
+  - more often in game programming
+
+## Lock-Free Concurrency
+
+More precisely, blocking-free.
+
+### Causes of Data Race Bugs
+
+- interruption of one critical section by another
+- instruction reordering by the compiler and CPU
+- memory ordering semantics of the hardware
+
+### Implementing Atomicity
+
+- Resolves races caused by interruption
+- Atomic RW: access to an aligned 4-byte block is usually atomic
+- Atomic RMW
+  - test and set (TAS): atomically sets a bool to true and returns its previous value. This can be used to implement a spin lock. `while (_tas(lockOccupied)) pause();`
+  - exchange: atomically swap the contents of a register and a location in memory.
+  - compare and swap (CAS): checks the existing value, and atomically swaps it with a new value iff the existing value matches the target. Returns a bool.
+
+### Barriers
+
+Resolves races caused by instruction reordering.
+
+#### Volatile (and why it doesn't help)
+
+- only guarantees that the content will not be cached in a register, and re-read from memory instead
+  - only some compilers prevent reordering across a R/W of a volatile variable
+- cannot prevent CPU's out-of-order execution, or cache coherency issues
+
+#### Compiler Barriers
+
+- Prevents reordering R/W instructions across specific boundaries
+- Explicit: e.g., `ams volatile`
+- Implicit: e.g., certain function calls (when the compiler cannot see the definition the function)
+- doesn't prevent CPU's out-of-order execution
+
+### Memory Ordering Semantics
+
+Different CPUs may have different memory ordering behavior, so we need a uniform set of semantics.
+
+#### Multicore Cache Coherency Protocols
+
+- get data from another cache is still quite fast
+- MESI
+  - L1 caches are connected with interconnect bus (ICB)
+  - first read of any core: exclusive
+  - read while some other core holds the content: shared
+  - shared being updated: modified, and invalid for others
+  - access invalid: shared, triggering a write-back to L2 (or RAM)
+  
+#### How MESI Can Go Wrong
+
+Core issue: optimization, e.g., deferring work, hoping to avoid it. Such optimizations work for single threads, but may go wrong in concurrent cases.
+
+E.g., 2 writes to different variables can happen in an opposite order in other cores' views.
+
+#### Memory Fences
+
+- aka. memory barriers
+- We call this the first instruction (in program order) has passed the second
+  - an R/W can pass another R/W, 4 cases in all
+- Fence instructions
+  - side-effects: serve as compiler barriers, and prevent CPU's out-of-order execution across them
+
+#### Acquire and Release Semantics
+
+- Release (write-release)
+  - a `write` to shared memory can never be passed by any other R/W that precedes it.
+  - It is `forward` direction. Memory operations that follow can happen before it.
+- Acquire (read-acquire)
+  - a `read` from shared memory can never be passed by any other R/W that occurs after it.
+  - It is `reverse` direction.
+- Full fence
+  - bidirectional and applies to both R and W.
+
+#### When to use acquire and release semantics
+
+- write-release: producer scenario, i.e., 2 consecutive writes. We can make the second write-release.
+  - put a fence with release semantics before it
+- read-acquire: consumer scenario, i.e., 2 consecutive reads. We make the first read-acquire.
+  - put a fence with acquire semantics after it
+
+### Atomic Variables
+
+
+
