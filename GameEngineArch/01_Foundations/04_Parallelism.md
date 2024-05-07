@@ -64,6 +64,7 @@
       - [Acquire and Release Semantics](#acquire-and-release-semantics)
       - [When to use acquire and release semantics](#when-to-use-acquire-and-release-semantics)
     - [Atomic Variables](#atomic-variables)
+      - [Memory Order](#memory-order)
 
 
 ## Intro
@@ -444,6 +445,7 @@ More precisely, blocking-free.
 - interruption of one critical section by another
 - instruction reordering by the compiler and CPU
 - memory ordering semantics of the hardware
+  - modification done in one core may be visible to aother in a different order
 
 ### Implementing Atomicity
 
@@ -456,7 +458,7 @@ More precisely, blocking-free.
 
 ### Barriers
 
-Resolves races caused by instruction reordering.
+Resolves races caused by instruction reordering and/or CPU out-of-order executions.
 
 #### Volatile (and why it doesn't help)
 
@@ -473,7 +475,8 @@ Resolves races caused by instruction reordering.
 
 ### Memory Ordering Semantics
 
-Different CPUs may have different memory ordering behavior, so we need a uniform set of semantics.
+Even if interrupts are disabled and reorderings behave correctly, memory ordering can still cause issues, e.g., core 1 writes i and then j into cache, but core 2 may observe j being updated before i in its cache.
+To make it more complicated, different CPUs may have different memory ordering behavior. We therefore need a uniform set of semantics to deal with this.
 
 #### Multicore Cache Coherency Protocols
 
@@ -489,13 +492,12 @@ Different CPUs may have different memory ordering behavior, so we need a uniform
 
 Core issue: optimization, e.g., deferring work, hoping to avoid it. Such optimizations work for single threads, but may go wrong in concurrent cases.
 
-E.g., 2 writes to different variables can happen in an opposite order in other cores' views.
+E.g., 2 writes to different variables can happen in the opposite order in aother core's view.
+In this case, we say that the first instruction (in program order) has passed the second. An R/W can pass another R/W, 4 cases in all.
 
 #### Memory Fences
 
 - aka. memory barriers
-- We call this the first instruction (in program order) has passed the second
-  - an R/W can pass another R/W, 4 cases in all
 - Fence instructions
   - side-effects: serve as compiler barriers, and prevent CPU's out-of-order execution across them
 
@@ -517,7 +519,38 @@ E.g., 2 writes to different variables can happen in an opposite order in other c
 - read-acquire: consumer scenario, i.e., 2 consecutive reads. We make the first read-acquire.
   - put a fence with acquire semantics after it
 
+```Cpp
+# Example
+std::atomic<bool> ready = false;
+// thread 1
+var.produce();
+// precedent RW (whether dependent or not) cannot be reordered pass it
+/* no reads or writes in the current thread can be reordered after this store. 
+All writes in the current thread are visible in other threads that acquire the same atomic variable (release-acquire) 
+and writes that carry a dependency into the atomic variable become visible in other threads that consume the same atomic (release-consume) */
+ready.store(true, std::memory_order_release);
+
+// thread 2
+/* no reads or writes in the current thread can be reordered before this load. 
+All writes in other threads that release the same atomic variable are visible in the current thread (release-acquire) */
+while (!ready.load(std::memory_order_acquire)) PAUSE();
+var.consume();
+```
+
 ### Atomic Variables
+
+`std::atomic`s are by default full fences, i.e., `memory_order_seq_cst`. They are lock-free when the underlying type has a size of 32 or 64 bits, and requires mutex when the type is larger.
+
+#### Memory Order
+
+- Release-acquire ordering
+  - If an atomic store in thread A is tagged memory_order_release, an atomic load in thread B from the same variable is tagged memory_order_acquire, and the load in thread B reads a value written by the store in thread A, then the store in thread A synchronizes-with the load in thread B.
+  - All memory writes (including non-atomic and relaxed atomic) that happened-before the atomic store from the point of view of thread A, become visible side-effects in thread B.
+  - The synchronization is established only between the threads releasing and acquiring the same atomic variable. Other threads can see different order of memory accesses than either or both of the synchronized threads.
+- Relationship with `volatile`
+  - Within a thread of execution, accesses (reads and writes) through volatile glvalues cannot be reordered past observable side-effects (including other volatile accesses) that are sequenced-before or sequenced-after within the same thread, but this order is not guaranteed to be observed by another thread, since volatile access does not establish inter-thread synchronization.
+  - In addition, volatile accesses are not atomic (concurrent read and write is a data race) and do not order memory (non-volatile memory accesses may be freely reordered around the volatile access).
+
 
 
 
